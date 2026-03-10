@@ -16,6 +16,7 @@ import {
   Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie,
   Cell, CartesianGrid
 } from "recharts";
+import { useAuth } from './AuthContext.jsx';
 
 // ─── Font Import ──────────────────────────────────────────────────────────────
 const FontStyle = () => (
@@ -245,7 +246,7 @@ function Badge({ children, color = "var(--green)", bg }) {
 }
 
 // ─── Floating Dock Navigation ───────────────────────────────────────────────────────────────
-function FloatingDock({ page, setPage }) {
+function Nav({ page, setPage, user, role, logout }) {
   if (page === "landing" || page === "login" || page === "register") return null;
   return (
     <div style={{
@@ -255,17 +256,31 @@ function FloatingDock({ page, setPage }) {
       border: "1px solid var(--border)", borderRadius: "32px",
       boxShadow: "0 20px 40px -10px rgba(28, 35, 33, 0.1), 0 8px 16px -4px rgba(28, 35, 33, 0.05)"
     }}>
-      <div style={{ display: "flex", gap: 12 }}>
-        <button className="btn-ghost" style={{ padding: "10px 16px", background: page === "startup" ? "var(--border-accent)" : "transparent", borderColor: page === "startup" ? "var(--green)" : "transparent", fontSize: "14px", borderRadius: "20px" }} onClick={() => setPage("startup")}>Startup</button>
-        <button className="btn-ghost" style={{ padding: "10px 16px", background: page === "investor" ? "rgba(15,76,92,0.1)" : "transparent", borderColor: page === "investor" ? "var(--cyan)" : "transparent", fontSize: "14px", borderRadius: "20px", color: page === "investor" ? "var(--cyan)" : "var(--text)" }} onClick={() => setPage("investor")}>Investor</button>
-        <button className="btn-ghost" style={{ padding: "10px 16px", background: page === "dd" ? "rgba(240,162,2,0.1)" : "transparent", borderColor: page === "dd" ? "var(--amber)" : "transparent", fontSize: "14px", borderRadius: "20px", color: page === "dd" ? "var(--amber)" : "var(--text)" }} onClick={() => setPage("dd")}>Due Diligence</button>
-      </div>
-      <div style={{ width: 1, height: 24, background: "var(--border)", margin: "0 8px" }} />
-      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--green-glow)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: "1px solid var(--border-accent)" }}>
-        <Bell size={18} color="var(--green)" />
-      </div>
-      <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", marginLeft: 4 }} onClick={() => setPage("landing")}>
-        <LogOut size={14} color="var(--bg)" />
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        {!user ? (
+          // Not logged in
+          page === 'landing' ? (
+            <>
+              <button className='btn-ghost' style={{ padding: '8px 18px', fontSize: '13px' }} onClick={() => setPage('login')}>Log In</button>
+              <button className='btn-primary' style={{ padding: '8px 18px', fontSize: '13px' }} onClick={() => setPage('register')}>Get Started</button>
+            </>
+          ) : null
+        ) : (
+          // Logged in - show only allowed dashboard
+          <>
+            {role === 'startup' && (
+              <button onClick={() => setPage('startup')} style={{ background: page === 'startup' ? 'rgba(0,255,135,0.1)' : 'transparent', border: `1px solid ${page==='startup' ? 'rgba(0,255,135,0.3)' : 'var(--border)'}`, color: page==='startup' ? 'var(--green)' : 'var(--text-sec)', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: '12px', fontFamily: 'DM Sans' }}>Startup</button>
+            )}
+            {role === 'investor' && (
+              <button onClick={() => setPage('investor')} style={{ background: page === 'investor' ? 'rgba(0,194,255,0.1)' : 'transparent', border: `1px solid ${page==='investor' ? 'rgba(0,194,255,0.3)' : 'var(--border)'}`, color: page==='investor' ? 'var(--cyan)' : 'var(--text-sec)', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: '12px', fontFamily: 'DM Sans' }}>Investor</button>
+            )}
+            <button onClick={() => setPage('dd')} style={{ background: page === 'dd' ? 'rgba(255,182,39,0.1)' : 'transparent', border: `1px solid ${page==='dd' ? 'rgba(255,182,39,0.3)' : 'var(--border)'}`, color: page==='dd' ? 'var(--amber)' : 'var(--text-sec)', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: '12px', fontFamily: 'DM Sans' }}>Due Diligence</button>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(0,255,135,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid var(--border-accent)' }}>
+              <Bell size={14} color='var(--green)' />
+            </div>
+            <button onClick={logout} style={{ padding: '6px 14px', borderRadius: 8, background: 'transparent', border: '1px solid var(--border)', color: 'var(--red)', cursor: 'pointer', fontSize: '12px', fontFamily: 'DM Sans' }}>Logout</button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -365,113 +380,180 @@ function Landing({ setPage }) {
 
 // ─── AUTH PAGES ───────────────────────────────────────────────────────────────
 function AuthPage({ mode, setPage }) {
-  const [role, setRole] = useState("");
-  const [step, setStep] = useState(mode === "register" ? 1 : 0);
-  const [form, setForm] = useState({ email: "", password: "", name: "", org: "" });
+  const { signup, signin, authError, setAuthError, role } = useAuth();
+  const [selectedRole, setSelectedRole] = useState('');
+  const [step, setStep] = useState(mode === 'register' ? 1 : 0);
+  const [form, setForm] = useState({ email: '', password: '', name: '', org: '' });
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
 
-  const handleSubmit = () => {
+  // Clear errors when switching fields
+  const handleField = (field, val) => {
+    setAuthError('');
+    setForm(f => ({ ...f, [field]: val }));
+  };
+
+  const handleSubmit = async () => {
     setLoading(true);
-    setTimeout(() => { setLoading(false); setPage(role === "investor" ? "investor" : "startup"); }, 1200);
+    if (mode === 'login') {
+      const res = await signin(form.email, form.password);
+      if (!res.success) setLoading(false);
+      // On success: role is now set in context, useEffect in App redirects
+    } else {
+      const res = await signup(form.email, form.password, form.name, form.org, selectedRole);
+      if (!res.success) setLoading(false);
+    }
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 24px", zIndex: 1, position: "relative" }}>
-      <div style={{ width: "100%", maxWidth: 420, animation: "fade-up 0.5s ease both" }}>
-        <div className="glass" style={{ padding: "36px 32px", borderColor: "rgba(16,185,129,0.15)" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text)", fontFamily: "Fraunces" }}>
-              {mode === "login" ? "Welcome back" : step === 1 ? "Choose your role" : step === 2 ? "Create account" : "You're all set"}
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 24px', zIndex: 1, position: 'relative' }}>
+      <div style={{ width: '100%', maxWidth: 420, animation: 'fade-up 0.5s ease both' }}>
+        <div className='glass' style={{ padding: '36px 32px', borderColor: 'rgba(0,255,135,0.15)' }}>
+
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'white', fontFamily: 'Space Grotesk' }}>
+              {mode === 'login' ? 'Welcome back' : step === 1 ? 'Choose your role' : step === 2 ? 'Create account' : "You're all set"}
             </div>
-            <p style={{ color: "var(--text-sec)", fontSize: "13px", marginTop: 6 }}>
-              {mode === "login" ? "Sign in to your ClimaTech account" : `Step ${step} of 3`}
+            <p style={{ color: 'var(--text-sec)', fontSize: '13px', marginTop: 6 }}>
+              {mode === 'login' ? 'Sign in to your ClimaTech account' : `Step ${step} of 3`}
             </p>
           </div>
 
-          {mode === "register" && (
-            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+          {/* Step progress bar - register only */}
+          {mode === 'register' && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
               {[1,2,3].map(n => (
-                <div key={n} style={{ flex: 1, height: 3, borderRadius: 2, background: n <= step ? "var(--green)" : "var(--border)", transition: "background 0.3s" }} />
+                <div key={n} style={{ flex: 1, height: 3, borderRadius: 2, background: n <= step ? 'var(--green)' : 'var(--border)', transition: 'background 0.3s' }} />
               ))}
             </div>
           )}
 
-          {(mode === "login" || step === 2) && (
+          {/* Error message */}
+          {authError ? (
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,77,109,0.1)', border: '1px solid rgba(255,77,109,0.3)', marginBottom: 16, fontSize: '12px', color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AlertTriangle size={13} /> {authError}
+            </div>
+          ) : null}
+
+          {/* LOGIN FORM */}
+          {mode === 'login' && (
             <>
-              {step === 2 && (
-                <>
-                  <div style={{ marginBottom: 14 }}>
-                    <label className="label" style={{ display: "block", marginBottom: 6 }}>Full Name</label>
-                    <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Alex Johnson" style={{ width: "100%", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", color: "var(--text)", fontFamily: "Figtree", fontSize: "14px", outline: "none" }} />
-                  </div>
-                  <div style={{ marginBottom: 14 }}>
-                    <label className="label" style={{ display: "block", marginBottom: 6 }}>Organization</label>
-                    <input value={form.org} onChange={e => setForm({...form, org: e.target.value})} placeholder="SolarGrid Innovations Ltd." style={{ width: "100%", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", color: "var(--text)", fontFamily: "Figtree", fontSize: "14px", outline: "none" }} />
-                  </div>
-                </>
-              )}
               <div style={{ marginBottom: 14 }}>
-                <label className="label" style={{ display: "block", marginBottom: 6 }}>Email Address</label>
-                <input value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="you@climatetech.io" type="email" style={{ width: "100%", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", color: "var(--text)", fontFamily: "Figtree", fontSize: "14px", outline: "none" }} />
+                <label className='label' style={{ display: 'block', marginBottom: 6 }}>Email Address</label>
+                <input value={form.email} onChange={e => handleField('email', e.target.value)} placeholder='you@climatetech.io' type='email'
+                  style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontFamily: 'DM Sans', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
-              <div style={{ marginBottom: 24, position: "relative" }}>
-                <label className="label" style={{ display: "block", marginBottom: 6 }}>Password</label>
-                <input value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder="••••••••" type={showPass ? "text" : "password"} style={{ width: "100%", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", color: "var(--text)", fontFamily: "Figtree", fontSize: "14px", outline: "none", paddingRight: 44 }} />
-                <button onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: 12, top: "62%", transform: "translateY(-50%)", background: "none", border: "none", color: "var(--text-sec)", cursor: "pointer" }}>
+              <div style={{ marginBottom: 24, position: 'relative' }}>
+                <label className='label' style={{ display: 'block', marginBottom: 6 }}>Password</label>
+                <input value={form.password} onChange={e => handleField('password', e.target.value)} placeholder='••••••••' type={showPass ? 'text' : 'password'}
+                  style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 44px 10px 14px', color: 'var(--text)', fontFamily: 'DM Sans', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                  onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
+                <button onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 12, top: '62%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-sec)', cursor: 'pointer' }}>
                   <Eye size={14} />
                 </button>
               </div>
-              <button className="btn-primary" style={{ width: "100%", padding: "13px", fontSize: "15px" }} onClick={mode === "login" ? handleSubmit : () => setStep(3)} disabled={loading}>
-                {loading ? "Signing in..." : mode === "login" ? "Sign In" : "Continue"}
+              <button className='btn-primary' style={{ width: '100%', padding: '13px', fontSize: '15px' }}
+                onClick={handleSubmit} disabled={loading || !form.email || !form.password}>
+                {loading ? 'Signing in...' : 'Sign In'}
               </button>
             </>
           )}
 
-          {mode === "register" && step === 1 && (
+          {/* REGISTER STEP 1 — Role selection */}
+          {mode === 'register' && step === 1 && (
             <>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
                 {[
-                  { r: "startup", icon: "🚀", title: "I'm a Climate Startup", desc: "List your project, get matched with investors, track funding.", color: "var(--green)" },
-                  { r: "investor", icon: "📈", title: "I'm an Investor", desc: "Discover vetted climate projects, AI due diligence, manage portfolio.", color: "var(--cyan)" }
+                  { r: 'startup', icon: '🚀', title: "I'm a Climate Startup", desc: 'List your project, get matched with investors, track funding.', color: 'var(--green)' },
+                  { r: 'investor', icon: '📈', title: "I'm an Investor", desc: 'Discover vetted climate projects, AI due diligence, manage portfolio.', color: 'var(--cyan)' }
                 ].map(o => (
-                  <div key={o.r} onClick={() => setRole(o.r)} style={{ padding: "16px 18px", borderRadius: 12, border: `1.5px solid ${role === o.r ? o.color : "var(--border)"}`, background: role === o.r ? `${o.color}08` : "var(--surface2)", cursor: "pointer", transition: "all 0.2s", opacity: role && role !== o.r ? 0.5 : 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <span style={{ fontSize: "1.5rem" }}>{o.icon}</span>
+                  <div key={o.r} onClick={() => setSelectedRole(o.r)}
+                    style={{ padding: '16px 18px', borderRadius: 12, border: `1.5px solid ${selectedRole === o.r ? o.color : 'var(--border)'}`, background: selectedRole === o.r ? `${o.color}08` : 'var(--surface2)', cursor: 'pointer', transition: 'all 0.2s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: '1.5rem' }}>{o.icon}</span>
                       <div>
-                        <div style={{ fontWeight: 600, color: role === o.r ? o.color : "var(--text)", fontSize: "14px" }}>{o.title}</div>
-                        <div style={{ fontSize: "12px", color: "var(--text-sec)", marginTop: 3 }}>{o.desc}</div>
+                        <div style={{ fontWeight: 600, color: selectedRole === o.r ? o.color : 'white', fontSize: '14px' }}>{o.title}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-sec)', marginTop: 3 }}>{o.desc}</div>
                       </div>
-                      {role === o.r && <CheckCircle size={16} color={o.color} style={{ marginLeft: "auto", flexShrink: 0 }} />}
+                      {selectedRole === o.r && <CheckCircle size={16} color={o.color} style={{ marginLeft: 'auto', flexShrink: 0 }} />}
                     </div>
                   </div>
                 ))}
               </div>
-              <button className="btn-primary" style={{ width: "100%", padding: "13px" }} onClick={() => role && setStep(2)} disabled={!role}>
+              <button className='btn-primary' style={{ width: '100%', padding: '13px' }} onClick={() => selectedRole && setStep(2)} disabled={!selectedRole}>
                 Continue →
               </button>
             </>
           )}
 
-          {mode === "register" && step === 3 && (
-            <div style={{ textAlign: "center" }}>
-              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(16,185,129,0.1)", border: "2px solid var(--green)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-                <CheckCircle size={28} color="var(--green)" />
+          {/* REGISTER STEP 2 — Account details */}
+          {mode === 'register' && step === 2 && (
+            <>
+              <div style={{ marginBottom: 14 }}>
+                <label className='label' style={{ display: 'block', marginBottom: 6 }}>Full Name</label>
+                <input value={form.name} onChange={e => handleField('name', e.target.value)} placeholder='Alex Johnson'
+                  style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontFamily: 'DM Sans', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
-              <p style={{ color: "var(--text-sec)", marginBottom: 24, fontSize: "14px" }}>
-                Creating your <strong style={{ color: "var(--text)" }}>{role}</strong> account for <strong style={{ color: "var(--text)" }}>{form.org || "your organization"}</strong>.
+              <div style={{ marginBottom: 14 }}>
+                <label className='label' style={{ display: 'block', marginBottom: 6 }}>Organization</label>
+                <input value={form.org} onChange={e => handleField('org', e.target.value)} placeholder='SolarGrid Innovations Ltd.'
+                  style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontFamily: 'DM Sans', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label className='label' style={{ display: 'block', marginBottom: 6 }}>Email Address</label>
+                <input value={form.email} onChange={e => handleField('email', e.target.value)} placeholder='you@climatetech.io' type='email'
+                  style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontFamily: 'DM Sans', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ marginBottom: 24, position: 'relative' }}>
+                <label className='label' style={{ display: 'block', marginBottom: 6 }}>Password</label>
+                <input value={form.password} onChange={e => handleField('password', e.target.value)} placeholder='••••••••' type={showPass ? 'text' : 'password'}
+                  style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 44px 10px 14px', color: 'var(--text)', fontFamily: 'DM Sans', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                <button onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 12, top: '62%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-sec)', cursor: 'pointer' }}>
+                  <Eye size={14} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 0 }}>
+                <button className='btn-ghost' style={{ flex: 1, padding: '12px' }} onClick={() => setStep(1)}>← Back</button>
+                <button className='btn-primary' style={{ flex: 2, padding: '12px' }}
+                  onClick={() => form.name && form.email && form.password && setStep(3)}
+                  disabled={!form.name || !form.email || !form.password}>
+                  Continue
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* REGISTER STEP 3 — Confirm & create */}
+          {mode === 'register' && step === 3 && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(0,255,135,0.1)', border: '2px solid var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <CheckCircle size={28} color='var(--green)' />
+              </div>
+              <p style={{ color: 'var(--text-sec)', marginBottom: 8, fontSize: '14px' }}>
+                Creating your <strong style={{ color: 'white' }}>{selectedRole}</strong> account
               </p>
-              <button className="btn-primary" style={{ width: "100%", padding: "13px" }} onClick={handleSubmit} disabled={loading}>
-                {loading ? "Creating account..." : "Launch Dashboard 🚀"}
-              </button>
+              <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: '12px', fontFamily: 'JetBrains Mono' }}>
+                {form.email}
+              </p>
+              {authError && (
+                <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,77,109,0.1)', border: '1px solid rgba(255,77,109,0.3)', marginBottom: 16, fontSize: '12px', color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertTriangle size={13} /> {authError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className='btn-ghost' style={{ flex: 1, padding: '12px' }} onClick={() => setStep(2)}>← Back</button>
+                <button className='btn-primary' style={{ flex: 2, padding: '12px' }} onClick={handleSubmit} disabled={loading}>
+                  {loading ? 'Creating account...' : 'Launch Dashboard 🚀'}
+                </button>
+              </div>
             </div>
           )}
 
-          <div style={{ marginTop: 20, textAlign: "center" }}>
-            {mode === "login" ? (
-              <span style={{ fontSize: "13px", color: "var(--text-sec)" }}>No account? <span style={{ color: "var(--green)", cursor: "pointer" }} onClick={() => setPage("register")}>Sign up free</span></span>
+          <div style={{ marginTop: 20, textAlign: 'center' }}>
+            {mode === 'login' ? (
+              <span style={{ fontSize: '13px', color: 'var(--text-sec)' }}>No account? <span style={{ color: 'var(--green)', cursor: 'pointer' }} onClick={() => setPage('register')}>Sign up free</span></span>
             ) : (
-              <span style={{ fontSize: "13px", color: "var(--text-sec)" }}>Already registered? <span style={{ color: "var(--green)", cursor: "pointer" }} onClick={() => setPage("login")}>Sign in</span></span>
+              <span style={{ fontSize: '13px', color: 'var(--text-sec)' }}>Already registered? <span style={{ color: 'var(--green)', cursor: 'pointer' }} onClick={() => setPage('login')}>Sign in</span></span>
             )}
           </div>
         </div>
@@ -479,6 +561,14 @@ function AuthPage({ mode, setPage }) {
     </div>
   );
 }
+
+// ─── STARTUP DASHBOARD ────────────────────────────────────────────────────────
+
+
+
+
+
+
 
 // ─── STARTUP DASHBOARD ────────────────────────────────────────────────────────
 function StartupDashboard() {
@@ -939,32 +1029,104 @@ function DueDiligence() {
 }
 
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
-export default function App() {
-  const [page, setPage] = useState("landing");
+// Loading screen shown while Firebase resolves auth state
+function LoadingScreen() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[0,1,2].map(i => (
+          <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', animation: `pulse-dot 1s ease ${i * 0.2}s infinite` }} />
+        ))}
+      </div>
+      <span className='mono' style={{ fontSize: '11px', color: 'var(--text-sec)', letterSpacing: '0.15em' }}>AUTHENTICATING...</span>
+    </div>
+  );
+}
 
-  const renderPage = () => {
+// Shown when a user tries to access the wrong dashboard
+function AccessDenied({ role, correctPage, setPage }) {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div className='glass' style={{ padding: '40px 36px', maxWidth: 400, textAlign: 'center', borderColor: 'rgba(255,77,109,0.3)' }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: 16 }}>🚫</div>
+        <h2 className='display' style={{ color: 'white', fontWeight: 700, marginBottom: 10 }}>Access Restricted</h2>
+        <p style={{ color: 'var(--text-sec)', fontSize: '13px', marginBottom: 24, lineHeight: 1.6 }}>
+          Your account is registered as a <strong style={{ color: 'var(--amber)' }}>{role}</strong>. You can only access the {role} dashboard.
+        </p>
+        <button className='btn-primary' style={{ width: '100%', padding: '12px' }} onClick={() => setPage(correctPage)}>
+          Go to {role === 'startup' ? 'Startup' : 'Investor'} Dashboard →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── ROOT APP ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const { user, role, loading, logout } = useAuth();
+  const [page, setPage] = useState('landing');
+
+  // Auto-redirect after login based on role
+  useEffect(() => {
+    if (!loading && user && role) {
+      if (role === 'investor') setPage('investor');
+      else if (role === 'startup') setPage('startup');
+    }
+    if (!loading && !user) {
+      // If logged out and on a protected page, go to landing
+      if (page === 'startup' || page === 'investor' || page === 'dd') {
+        setPage('landing');
+      }
+    }
+  }, [user, role, loading]);
+
+  // Role-based page guard
+  const getPage = () => {
+    // Only block on Firebase Auth resolving — NOT on Firestore role fetch
+    // Role arrives shortly after in background; dashboards guard themselves
+    if (loading) return <LoadingScreen />;
+
     switch (page) {
-      case "landing": return <Landing setPage={setPage} />;
-      case "login": return <AuthPage mode="login" setPage={setPage} />;
-      case "register": return <AuthPage mode="register" setPage={setPage} />;
-      case "startup": return <StartupDashboard />;
-      case "investor": return <InvestorDashboard />;
-      case "dd": return <DueDiligence />;
-      default: return <Landing setPage={setPage} />;
+      case 'landing':
+        return <Landing setPage={setPage} />;
+
+      case 'login':
+        if (user && role) return role === 'investor' ? <InvestorDashboard /> : <StartupDashboard />;
+        return <AuthPage mode='login' setPage={setPage} />;
+
+      case 'register':
+        if (user && role) return role === 'investor' ? <InvestorDashboard /> : <StartupDashboard />;
+        return <AuthPage mode='register' setPage={setPage} />;
+
+      case 'startup':
+        if (!user) return <AuthPage mode='login' setPage={setPage} />;
+        if (role === 'investor') return <AccessDenied role='investor' correctPage='investor' setPage={setPage} />;
+        return <StartupDashboard />;
+
+      case 'investor':
+        if (!user) return <AuthPage mode='login' setPage={setPage} />;
+        if (role === 'startup') return <AccessDenied role='startup' correctPage='startup' setPage={setPage} />;
+        return <InvestorDashboard />;
+
+      case 'dd':
+        if (!user) return <AuthPage mode='login' setPage={setPage} />;
+        return <DueDiligence />;
+
+      default:
+        return <Landing setPage={setPage} />;
     }
   };
 
   return (
     <>
       <FontStyle />
-      <div style={{ minHeight: "100vh", background: "var(--bg)", position: "relative" }}>
-        <ParticleCanvas density={page === "landing" ? 90 : 50} />
-        {/* Ambient orbs */}
-        <div style={{ position: "fixed", top: "20%", left: "10%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.04) 0%, transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
-        <div style={{ position: "fixed", bottom: "30%", right: "8%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(14,165,233,0.03) 0%, transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
-        <FloatingDock page={page} setPage={setPage} />
-        <div style={{ position: "relative", zIndex: 1 }}>
-          {renderPage()}
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', position: 'relative' }}>
+        <ParticleCanvas density={page === 'landing' ? 90 : 50} />
+        <div style={{ position: 'fixed', top: '20%', left: '10%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,255,135,0.04) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+        <div style={{ position: 'fixed', bottom: '30%', right: '8%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,194,255,0.03) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+        <Nav page={page} setPage={setPage} user={user} role={role} logout={logout} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          {getPage()}
         </div>
       </div>
     </>
